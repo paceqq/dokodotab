@@ -10,15 +10,15 @@ namespace doko
         public int LastValue { get; private set; }
         public int BockCounter { get; private set; }
 
-        readonly Players player;
+        readonly Player[] player;
 
-        public Points(Players player) {
+        public Points(Player[] player) {
             this.player = player;
             GamePoints = new Dictionary<Player, Tuple<int,int>>();
             LastValue = 0;
             BockCounter = 0;
 
-            foreach (var person in player.Names)
+            foreach (var person in this.player)
             {
                 GamePoints.Add(person, new Tuple<int, int>(0,0));
             }
@@ -31,9 +31,9 @@ namespace doko
 
         public void AddGame(Game game, bool bock) {
             var winner = game.Winner;
-            var loser = player.Invert(winner);
+            var loser = game.Players.Invert(winner);
             int bockFactor = 1;
-            if (game.Bock) {
+            if (game.BockRound) {
                 BockCounter += 4;
             }
 
@@ -55,7 +55,7 @@ namespace doko
                 case 2:
                     break;
                 default:
-                    throw new ArgumentException("Amount of winner does not fit");
+                    throw new ArgumentException("Amount of winner is not logical");
             }
 
             foreach (var winningPerson in winner)

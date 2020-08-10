@@ -1,34 +1,30 @@
 ﻿using System;
 using System.Collections.Generic;
 
+using doko.Debug;
+
 namespace doko
 {
     public class EntryPoint
     {
         static void Main() {
-            Players p = new Players(new String[] { "Joe", "William", "Jack", "Averell" });
-            Player[] players = p.Names;
-            Session s = new Session(p);
+            Player[] players = Player.CreatePlayers(new String[] { "Joe", "William", "Jack", "Averell", "Luke"});
+            Session s = new Session(players);
 
-            s.AddGame(new Game(getPlayer(players, 1, 2), 3, false));
-            s.AddGame(new Game(getPlayer(players, 0, 2), 1, false));
-            s.AddGame(new Game(getPlayer(players, 0, 1), 2, false));
-            s.AddGame(new Game(getPlayer(players, 1, 3), 1, true));
-            s.AddGame(new Game(getPlayer(players, 0, 2,3), 3, false));
-            s.AddGame(new Game(getPlayer(players, 2), 4, false));
-            s.AddGame(new Game(getPlayer(players, 1, 3), 1, true));
-            s.AddGame(new Game(getPlayer(players, 0, 3), 2, false));
+            s.AddStandard(3, false, "William", "Jack");
+            s.AddStandard(1, false, "Averell", "Jack");
+            s.AddStandard(2, false, "Joe", "Luke");
+            s.AddStandard(1, true, "William", "Averell");
+            s.AddSolo(3, false, "Joe", "Jack", "Luke");
+            s.AddSolo(4, false, "Jack");
+            s.AddStandard(1, true, "William", "Averell");
+            s.AddStandard(2, false, "Joe", "Averell");
+
             s.PrintSession();
             Console.WriteLine("");
             s.PrintLastGame();
         }
 
-        static Player[] getPlayer(Player[] p, params int[] index) {
-            List<Player> player = new List<Player>();
-            foreach (int i in index) {
-                player.Add(p[i]);
-            }
-            return player.ToArray();
-        }
     }
+
 }

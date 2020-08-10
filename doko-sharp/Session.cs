@@ -1,78 +1,51 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace doko
 {
     public class Session
     {
-        public Players Players { get; private set; }
-
-        public List<Game> gameHistory { get; private set; }
-
-        public Session(Players player) {
-            gameHistory = new List<Game>();
-            Players = player;    
+        public Player[] CurrentPlayers { get; private set; }
+        public Player[] ActivePlayers { 
+            get {
+                Player[] buf = new Player[4];
+                int len = CurrentPlayers.Length - roundNumber;
+                if (len > 4) {
+                    len = 4;
+                }
+                Array.Copy(CurrentPlayers, roundNumber, buf, 4 - len, len);
+                for (int i = 0; i < 4 - len; i++) {
+                    buf[i] = CurrentPlayers[i];
+                }
+                return buf;
+            }
         }
+
+        public List<Game> GameHistory { get; private set; }
+
+        private int roundNumber;
 
         public Session(Player[] player) {
-            gameHistory = new List<Game>();
-            Players = new Players(player);
+            GameHistory = new List<Game>();
+            CurrentPlayers = player;
+
+            roundNumber = 0;
         }
 
-        public Session(String[] player) {
-            gameHistory = new List<Game>();
-            Players = new Players(player);
+        private void addGame(Game game) {
+            GameHistory.Add(game);
+            roundNumber = (roundNumber + 1) % CurrentPlayers.Length;
         }
 
-        public void AddGame(Game game) {
-            gameHistory.Add(game);
+        public void AddStandard(int points, bool bock, params String[] winner)
+        {
+            addGame(Game.StandardGame(ActivePlayers, points, bock, winner));
         }
-
-        private void PrintGame(Points point, int i, bool printSingle) {
-            Console.Write(" | ");
-            foreach (var player in Players.Names)
-            {
-                String format = String.Format("{{0,{0}}}", player.Name.Length);
-                int points;
-                if (printSingle) {
-                    points = point.GamePoints[player].Item1;
-                } else
-                {
-                    points = point.GamePoints[player].Item2;
-                }
-                Console.Write(format+" | ", points);
-            }
-            Console.WriteLine("{0,5} | {1,4} |", point.LastValue, point.BockCounter);
-        }
-
-        private void PrintHeader() {
-            Console.Write(" | ");
-            foreach (var player in Players.Names) {
-                Console.Write("{0} | ", player.Name);
-            }
-            Console.WriteLine("Spiel | Bock |");
-        }
-
-        public void PrintLastGame() {
-            Print(true);
-        }
-
-        public void PrintSession() {
-            Print(false);
-        }
-
-        private void Print(bool onlyLast) {
-            PrintHeader();
-            Points point = new Points(Players);
-            for (int i = 0; i < gameHistory.Count; i++)
-            {
-                point.AddGame(gameHistory[i]);
-                if (!onlyLast || (i == gameHistory.Count -1 ) )
-                {
-                    PrintGame(point, i, onlyLast);
-                }
-            }
+        public void AddSolo(int points, bool bock, params String[] winner)
+        {
+            addGame(Game.Solo(ActivePlayers, points, bock, winner));
         }
 
     }
