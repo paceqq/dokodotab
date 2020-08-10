@@ -65,5 +65,10 @@ namespace doko
 
             return ret;
         }
+
+        public static bool HasPlayer(this Player[] players, String name)
+        {
+            return players.Any((player) => { return player.Equals(name); });
+        }
     }
 }
