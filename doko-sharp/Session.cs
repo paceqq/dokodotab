@@ -23,6 +23,18 @@ namespace doko
             }
         }
 
+        public String ActivePlayerString
+        {
+            get {
+                String activePlayers = "";
+                foreach (var player in this.ActivePlayers)
+                {
+                    activePlayers += " " + player.Name;
+                }
+                return activePlayers.Substring(1);
+            }
+        }
+
         public List<Game> GameHistory { get; private set; }
 
         private int roundNumber;

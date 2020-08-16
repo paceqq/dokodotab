@@ -4,31 +4,53 @@ using System.Text;
 
 namespace doko
 {
+    public enum State
+    {
+        CreateParty,
+        RunSession
+    }
+
     public class CommandParser {
 
-        private Dictionary<String, Action<String[]>> commandList;
-        private Action<String[]> defaultCmd = null;
         
+
+        private Dictionary<State, ParserState> statefulCommands;
+        private State currentState;
+
         public CommandParser() {
-            commandList = new Dictionary<string, Action<string[]>>();
+            statefulCommands = new Dictionary<State, ParserState>();
+            foreach (State state in Enum.GetValues(typeof(State))) {
+                statefulCommands.Add(state, new ParserState());
+            }
+            currentState = State.CreateParty;
         }
 
-        public void BindFunction(String name, Action<String[]> command) {
-            commandList.Add(name, command);
+        public void BindFunction(String name, Func<String[], State?> command, params State[] states) {
+            foreach (var state in states) {
+                statefulCommands[state].BindFunction(name, command);
+            }
         }
 
-        public void BindDefault(Action<String[]> command) {
-            defaultCmd = command;
+        public void BindDefault(Func<String[], State?> command, params State[] states) {
+            foreach (var state in states) {
+                statefulCommands[state].BindDefault(command);
+            }
+        }
+
+        public void ChangeState(State newState) {
+            currentState = newState;
         }
 
         public void Parse(String cmdLine) {
             // TODO check
             // Preop
 
-
             if (cmdLine.Equals("?")) {
-                foreach (string key in commandList.Keys) {
+                foreach (string key in statefulCommands[currentState].commandList.Keys) {
                     Console.Write(key + " ");
+                }
+                if (!(statefulCommands[currentState].defaultCmd is null)) {
+                    Console.Write("[default]");
                 }
                 Console.WriteLine();
                 return;
@@ -38,22 +60,47 @@ namespace doko
             String[] args = new string[values.Length - 1];
             Array.Copy(values, 1, args, 0, values.Length - 1);
             String cmd = values[0];
-            if (commandList.ContainsKey(cmd))
+            State? returnState = null;
+            if (statefulCommands[currentState].commandList.ContainsKey(cmd))
             {
-                commandList[cmd](args);
+                returnState = statefulCommands[currentState].commandList[cmd](args);
             }
             else {
-                if (defaultCmd is null)
+                if (statefulCommands[currentState].defaultCmd is null)
                 {
                     Console.WriteLine("Command \"" + cmd + "\" not found");
                 }
                 else {
-                    defaultCmd(values);
+                    returnState = statefulCommands[currentState].defaultCmd(values);
                 }
+            }
+
+            if (returnState.HasValue) {
+                ChangeState(returnState.Value);
             }
             
         }
 
+    }
+
+    public class ParserState {
+        public Dictionary<String, Func<String[], State?>> commandList { get; private set; }
+        public Func<String[], State?> defaultCmd { get; private set; } = null;
+
+        public ParserState()
+        {
+            commandList = new Dictionary<String, Func<String[], State?>>();
+        }
+
+        public void BindFunction(String name, Func<String[], State?> command)
+        {
+            commandList.Add(name, command);
+        }
+
+        public void BindDefault(Func<String[], State?> command)
+        {
+            defaultCmd = command;
+        }
     }
 }
 
