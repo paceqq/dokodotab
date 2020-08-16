@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace doko
 {
@@ -16,6 +18,8 @@ namespace doko
 
         private Dictionary<State, ParserState> statefulCommands;
         private State currentState;
+
+        private static Regex rgx = new Regex(@"^[a-zA-Z0-9][a-zA-Z0-9 ]*[a-zA-Z0-9]$");
 
         public CommandParser() {
             statefulCommands = new Dictionary<State, ParserState>();
@@ -42,9 +46,6 @@ namespace doko
         }
 
         public void Parse(String cmdLine) {
-            // TODO check
-            // Preop
-
             if (cmdLine.Equals("?")) {
                 foreach (string key in statefulCommands[currentState].commandList.Keys) {
                     Console.Write(key + " ");
@@ -56,7 +57,13 @@ namespace doko
                 return;
             }
 
-            String[] values = cmdLine.Split(' ');
+            if(!rgx.IsMatch(cmdLine))
+            {
+                Console.WriteLine("Kommando enthält nicht legitime Zeichen.");
+                return;
+            }
+
+            String[] values = cmdLine.Split(' ').Where((s) => { return !string.IsNullOrEmpty(s); }).ToArray();
             String[] args = new string[values.Length - 1];
             Array.Copy(values, 1, args, 0, values.Length - 1);
             String cmd = values[0];
