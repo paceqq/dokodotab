@@ -1,0 +1,66 @@
+﻿<!doctype html>
+<html>
+<body>
+<style>
+    body {position: absolute; bottom: 0px; top:0px;}
+    #container {display:flex; flex-direction:column; height:100%;}
+    #output { flex: 1 1 auto; display:flex; flex-direction: column-reverse; flex-wrap:nowrap; overflow: hidden; }
+    #output > p { overflow-wrap: break-word; margin:0px; margin-bottom: 5px; margin-left:5px;}
+    #output span { margin-left:20px; width:50px; display:inline-block; }
+    #output span.error { color: red; }
+</style>
+<div id="container">
+    <h2>WebSocket Test</h2>
+    <div id="output"></div>
+    <div>
+        <input type="text"/>
+        <button>send</button>
+    </div>
+</div>
+
+<script>
+    
+    var button = document.querySelector("button"),
+        output = document.querySelector("#output"),
+        textfield = document.querySelector("input"),
+    
+        wsUri = "ws://localhost/",
+        websocket = new WebSocket(wsUri);
+
+    textfield.addEventListener("keyup", function(event) {
+        // Number 13 is the "Enter" key on the keyboard
+        if (event.keyCode === 13) {
+            // Cancel the default action, if needed
+            event.preventDefault();
+            send()
+        }
+    }); 
+    button.addEventListener("click", send);
+
+    websocket.onmessage = function (e) {
+        writeToScreen("<span>" + e.data.replace(/\n/g,"</span></p><p><span>").replace(/\|/g,"</span><span>") + "</span>");
+    };
+
+    websocket.onerror = function (e) {
+        writeToScreen("<span class=error>ERROR:</span> " + e.data);
+    };
+
+    function doSend(message) {
+        writeToScreen(message);
+        websocket.send(message);
+    }
+
+    function writeToScreen(message) {
+        output.insertAdjacentHTML("afterbegin", "<div><p>" + message + "</p></div>");
+    }
+
+    function send() {
+        var text = textfield.value;
+
+        text && doSend(text);
+        textfield.value = "";
+        textfield.focus();
+    }
+</script>
+</body>
+</html>

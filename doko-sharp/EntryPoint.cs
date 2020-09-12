@@ -2,43 +2,126 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
-using doko.Debug;
+//using doko.Debug;
+
+using System.IO;
+
+using System.Net.WebSockets;
+using System.Net;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Text;
 
 namespace doko
 {
     public class EntryPoint
     {
 
-        static void Main() {
+        static void Main()
+        {
+            runWebsocket();
+        }
+
+        static async void startWSHandler(object context_raw) {
+
+            // create a Cancellation Token
+            var TokenSource = new CancellationTokenSource();
+            var Token = TokenSource.Token;
+
+            // create the websocket
+            HttpListenerContext context = context_raw as HttpListenerContext;
+            var ws = await context.AcceptWebSocketAsync(null);
+            
+            // some content converter
+            byte[] buffy = new byte[4096];
+            var text_decoder = new System.Text.UTF8Encoding();
+
+
+            List<Player> player = new List<Player>();
+            StringBuilder stringBuilder = new StringBuilder();
+            Session session = null;
+            CommandParser parser = createParser(session, player, stringBuilder);
+            parser.Builder = stringBuilder;
+            // actual processing
+            while (true)
+            {
+                var wsresult = await ws.WebSocket.ReceiveAsync(new ArraySegment<byte>(buffy), Token);
+                
+                if (wsresult.MessageType != WebSocketMessageType.Close)
+                {
+                    string cmd = text_decoder.GetString(buffy, 0, wsresult.Count);
+                    System.Console.Write("> ");
+                    System.Console.WriteLine(cmd);
+
+                    stringBuilder.Clear();
+                    parser.Parse(cmd);
+                    
+                    if (stringBuilder.Length != 0)
+                    {
+                        System.Console.WriteLine(stringBuilder.ToString());
+                        await ws.WebSocket.SendAsync(text_decoder.GetBytes(stringBuilder.ToString()), WebSocketMessageType.Text, true, Token);
+                    }
+                }
+                else //else close
+                {
+                    ws.WebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Bye", Token).Wait();
+                    Console.WriteLine("Closed WebSocket");
+                    return;
+                }
+            }
+            
+            
+        }
+
+        static void runWebsocket() {            
+            HttpListener listener = new HttpListener();
+            listener.Prefixes.Add("http://localhost/");
+            listener.Start();
+            Console.WriteLine("Listening...");
 
             bool run = true;
-            List<Player> rawPlayer = new List<Player>();
-            Session session = null;
+            while (run)
+            {
+                // Wait for Request
+                HttpListenerContext context = listener.GetContext();
+                HttpListenerRequest request = context.Request;
 
-            CommandParser parser = new CommandParser();
-            parser.BindFunction(
-                "Exit", (str) => { 
+                if (request.RawUrl.Equals("/Exit"))
+                {
                     run = false;
-                    return null;
-                },
-                State.CreateParty, State.RunSession
-            );
+                }
 
+                if (request.IsWebSocketRequest)
+                {
+                    var thread = new Thread(startWSHandler);
+                    thread.Start(context);
+                    continue;
+                }
+
+                HttpListenerResponse response = context.Response;
+
+                // Construct a response.
+                string responseString = File.ReadAllText(@"G:\GIT\dokodotab\doko-sharp\Test.html");
+                byte[] buffer = System.Text.Encoding.UTF8.GetBytes(responseString);
+
+                // Get a response stream and write the response to it.
+                response.ContentLength64 = buffer.Length;
+                System.IO.Stream output = response.OutputStream;
+                output.Write(buffer, 0, buffer.Length);
+                // You must close the output stream.
+                output.Close();
+
+                Console.WriteLine("Served client");
+            }
+            listener.Stop();
+        }
+
+        static CommandParser createParser(Session session, List<Player> player, StringBuilder builder) {
+            CommandParser parser = new CommandParser();
+            
             parser.BindFunction(
                 "Add", (str) => {
-                    rawPlayer.Add(new Player(String.Join(' ', str)));
-                    return null;
-                },
-                State.CreateParty
-            );
-
-            parser.BindFunction(
-                "Default", (str) => {
-                    rawPlayer.Add(new Player("Joe"));
-                    rawPlayer.Add(new Player("William"));
-                    rawPlayer.Add(new Player("Jack"));
-                    rawPlayer.Add(new Player("Averell"));
-                    rawPlayer.Add(new Player("Luke"));
+                    player.Add(new Player(String.Join(' ', str)));
                     return null;
                 },
                 State.CreateParty
@@ -46,8 +129,9 @@ namespace doko
 
             parser.BindFunction(
                 "List", (str) => {
-                    foreach (var player in rawPlayer) {
-                        Console.WriteLine(player.Name);
+                    foreach (var player in player)
+                    {
+                        builder.AppendLine(player.Name);
                     }
                     return null;
                 },
@@ -56,13 +140,14 @@ namespace doko
 
             parser.BindFunction(
                 "Start", (str) => {
-                    if (rawPlayer.Count < 4) {
-                        Console.WriteLine("Need more player!");
+                    if (player.Count < 4)
+                    {
+                        builder.AppendLine("Need more player!");
                         return null;
                     }
 
-                    session = new Session(rawPlayer.ToArray());
-                    
+                    session = new Session(player.ToArray());
+
                     return State.RunSession;
                 },
                 State.CreateParty
@@ -70,7 +155,7 @@ namespace doko
 
             parser.BindFunction(
                 "Print", (str) => {
-                    session.PrintSession();
+                    builder.Append(session.GetSessionString());
                     return null;
                 },
                 State.RunSession
@@ -78,7 +163,7 @@ namespace doko
 
             parser.BindFunction(
                 "Active", (str) => {
-                    Console.WriteLine("Es spielen: " + session.ActivePlayerString);
+                    builder.AppendLine("Es spielen: " + session.ActivePlayerString);
                     return null;
                 },
                 State.RunSession
@@ -95,7 +180,8 @@ namespace doko
                     String playerName = null;
                     int points = -1;
 
-                    foreach (var arg in str) {
+                    foreach (var arg in str)
+                    {
                         if (arg.Equals("Lost"))
                         {
                             lost = true;
@@ -108,30 +194,32 @@ namespace doko
                         {
                             playerName = arg;
                         }
-                        else {
+                        else
+                        {
                             try
                             {
                                 points = Int32.Parse(arg);
                             }
                             catch
                             {
-                                Console.WriteLine("Parametereingabe ist falsch!" + " (" + arg + ")");
-                                Console.WriteLine("Parameter muss eine Punktezahl, den Solo-Spieler und optional \"Bock\" oder \"Lost\" angeben.");
+                                builder.AppendLine("Parametereingabe ist falsch!" + " (" + arg + ")");
+                                builder.AppendLine("Parameter muss eine Punktezahl, den Solo-Spieler und optional \"Bock\" oder \"Lost\" angeben.");
 
-                                Console.WriteLine("Es spielen: " + session.ActivePlayerString);
+                                builder.AppendLine("Es spielen: " + session.ActivePlayerString);
                                 return null;
                             }
                         }
                     }
 
-                    if (points == -1) {
-                        Console.WriteLine("Spielwert muss angegeben werden!");
+                    if (points == -1)
+                    {
+                        builder.AppendLine("Spielwert muss angegeben werden!");
                         return null;
                     }
 
                     if (playerName is null)
                     {
-                        Console.WriteLine("Solo Spieler muss angegeben werden!");
+                        builder.AppendLine("Solo Spieler muss angegeben werden!");
                         return null;
                     }
 
@@ -139,17 +227,20 @@ namespace doko
                     {
                         String[] winningPlayersName = (from player in session.ActivePlayers.Invert(new Player[] { new Player(playerName) }) select player.Name).ToArray();
                         session.AddSolo(points, bock, winningPlayersName);
-                    } else {
+                    }
+                    else
+                    {
                         session.AddSolo(points, bock, playerName);
                     }
-                    session.PrintLastGame();
+                    builder.Append(session.GetLastGameString());
                     return null;
                 },
                 State.RunSession
             );
 
             parser.BindDefault(
-                (str) => {
+                (str) =>
+                {
                     // default value
                     bool bock = false;
 
@@ -163,7 +254,7 @@ namespace doko
                         {
                             bock = true;
                         }
-                        else if (session.ActivePlayers.HasPlayer(arg) && players.Count< 2 && (players.Count != 1 || !players[0].Equals(arg))) // Last Expression is an =>
+                        else if (session.ActivePlayers.HasPlayer(arg) && players.Count < 2 && (players.Count != 1 || !players[0].Equals(arg))) // Last Expression is an =>
                         {
                             players.Add(arg);
                         }
@@ -175,9 +266,9 @@ namespace doko
                             }
                             catch
                             {
-                                Console.WriteLine("Parametereingabe ist falsch!" + " (" + arg + ")");
-                                Console.WriteLine("Parameter muss eine Punktezahl, zwei aktive Spieler und optional \"Bock\" angeben.");
-                                Console.WriteLine("Es spielen: " + session.ActivePlayerString);
+                                builder.AppendLine("Parametereingabe ist falsch!" + " (" + arg + ")");
+                                builder.AppendLine("Parameter muss eine Punktezahl, zwei aktive Spieler und optional \"Bock\" angeben.");
+                                builder.AppendLine("Es spielen: " + session.ActivePlayerString);
                                 return null;
                             }
                         }
@@ -185,31 +276,23 @@ namespace doko
 
                     if (points == -1)
                     {
-                        Console.WriteLine("Spielwert muss angegeben werden!");
+                        builder.AppendLine("Spielwert muss angegeben werden!");
                         return null;
                     }
 
-                    if (players.Count !=2)
+                    if (players.Count != 2)
                     {
-                        Console.WriteLine("Es müssen genau 2 Gewinner angegeben werden!");
+                        builder.AppendLine("Es müssen genau 2 Gewinner angegeben werden!");
                         return null;
                     }
 
                     session.AddStandard(points, bock, players.ToArray());
-                    session.PrintLastGame();
+                    builder.Append(session.GetLastGameString());
                     return null;
                 },
                 State.RunSession
-            );
-
-            while (run) {
-                Console.Write("> ");
-                parser.Parse(Console.ReadLine());
-            }
-
-            Console.WriteLine("ByeBye");
-            
-            return;
+                );
+            return parser;
         }
 
     }

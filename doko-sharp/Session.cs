@@ -60,5 +60,59 @@ namespace doko
             addGame(Game.Solo(ActivePlayers, points, bock, winner));
         }
 
+        public String GetLastGameString()
+        {
+            return this.getTable(true);
+        }
+
+        public String GetSessionString()
+        {
+            return this.getTable(false);
+        }
+
+        private String getTable(bool onlyLast)
+        {
+            StringBuilder builder = new StringBuilder();
+            // Print Header
+            builder.Append(" | ");
+            foreach (var player in this.CurrentPlayers)
+            {
+                builder.AppendFormat("{0} | ", player.Name);
+            }
+            builder.AppendLine("| Spiel | Bock |");
+
+            // Print points
+            Points point = new Points(this.CurrentPlayers);
+            Game game;
+            // Loop through games
+            for (int i = 0; i < this.GameHistory.Count; i++)
+            {
+                game = this.GameHistory[i];
+                point.AddGame(game);
+                if (!onlyLast || (i == this.GameHistory.Count - 1))
+                {
+                    builder.Append(" | ");
+                    // Loop through players
+                    foreach (var player in this.CurrentPlayers)
+                    {
+                        String format = String.Format("{{0,{0}}}", player.Name.Length);
+                        // Print score only if player is active player
+                        if (player.IsIn(game.Players))
+                        {
+                            var playerPoint = point.GamePoints[player];
+                            // Print only last games score (including Bock, that's why we are still iterating)
+                            builder.AppendFormat(format + " | ", onlyLast ? playerPoint.Item1 : playerPoint.Item2);
+                        }
+                        else
+                        {
+                            builder.AppendFormat(format + " | ", "-");
+                        }
+                    }
+                    builder.AppendFormat("| {0,5} | {1,4} |\n", point.LastValue, point.BockCounter);
+                }
+            }
+            return builder.ToString();
+        }
+
     }
 }

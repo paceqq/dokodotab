@@ -13,11 +13,11 @@ namespace doko
     }
 
     public class CommandParser {
-
         
-
         private Dictionary<State, ParserState> statefulCommands;
         private State currentState;
+
+        public StringBuilder Builder { get; set; }
 
         private static Regex rgx = new Regex(@"^[a-zA-Z0-9][a-zA-Z0-9 ]*[a-zA-Z0-9]$");
 
@@ -45,22 +45,22 @@ namespace doko
             currentState = newState;
         }
 
-        public void Parse(String cmdLine) {
+        public bool Parse(String cmdLine) {
             if (cmdLine.Equals("?")) {
                 foreach (string key in statefulCommands[currentState].commandList.Keys) {
-                    Console.Write(key + " ");
+                    Builder.Append(key + " ");
                 }
                 if (!(statefulCommands[currentState].defaultCmd is null)) {
-                    Console.Write("[default]");
+                    Builder.Append("[default]");
                 }
                 Console.WriteLine();
-                return;
+                return true;
             }
 
             if(!rgx.IsMatch(cmdLine))
             {
-                Console.WriteLine("Kommando enthält nicht legitime Zeichen.");
-                return;
+                Builder.AppendLine("Kommando enthält nicht legitime Zeichen.");
+                return true;
             }
 
             String[] values = cmdLine.Split(' ').Where((s) => { return !string.IsNullOrEmpty(s); }).ToArray();
@@ -75,7 +75,8 @@ namespace doko
             else {
                 if (statefulCommands[currentState].defaultCmd is null)
                 {
-                    Console.WriteLine("Command \"" + cmd + "\" not found");
+                    Builder.AppendLine("Command \"" + cmd + "\" not found");
+                    return true;
                 }
                 else {
                     returnState = statefulCommands[currentState].defaultCmd(values);
@@ -85,7 +86,7 @@ namespace doko
             if (returnState.HasValue) {
                 ChangeState(returnState.Value);
             }
-            
+            return false;
         }
 
     }
