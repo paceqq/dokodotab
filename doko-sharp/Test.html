@@ -6,7 +6,8 @@
     #container {display:flex; flex-direction:column; height:100%;}
     #output { flex: 1 1 auto; display:flex; flex-direction: column-reverse; flex-wrap:nowrap; overflow: hidden; }
     #output > p { overflow-wrap: break-word; margin:0px; margin-bottom: 5px; margin-left:5px;}
-    #output span { margin-left:20px; width:50px; display:inline-block; }
+    #output span { margin-left:20px;}
+    .table span {width:50px; display:inline-block;}
     #output span.error { color: red; }
 </style>
 <div id="container">
@@ -24,7 +25,7 @@
         output = document.querySelector("#output"),
         textfield = document.querySelector("input"),
     
-        wsUri = "ws://localhost/",
+        wsUri = "ws://<!--DOMAIN-->/",
         websocket = new WebSocket(wsUri);
 
     textfield.addEventListener("keyup", function(event) {
@@ -38,7 +39,8 @@
     button.addEventListener("click", send);
 
     websocket.onmessage = function (e) {
-        writeToScreen("<span>" + e.data.replace(/\n/g,"</span></p><p><span>").replace(/\|/g,"</span><span>") + "</span>");
+        table = (e.data.indexOf("|") != -1);
+        writeToScreen("<span>" + e.data.replace(/\n/g,"</span></p><p><span>").replace(/\|/g,"</span><span>") + "</span>",table);
     };
 
     websocket.onerror = function (e) {
@@ -50,8 +52,8 @@
         websocket.send(message);
     }
 
-    function writeToScreen(message) {
-        output.insertAdjacentHTML("afterbegin", "<div><p>" + message + "</p></div>");
+    function writeToScreen(message, table = false) {
+        output.insertAdjacentHTML("afterbegin", "<div" + (table?" class=table":"")+"><p>" + message + "</p></div>");
     }
 
     function send() {
